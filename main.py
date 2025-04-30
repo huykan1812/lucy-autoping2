@@ -1,8 +1,8 @@
 import os
-from dotenv import load_dotenv
 from telegram import Update, File
 from telegram.ext import ApplicationBuilder, ContextTypes, MessageHandler, filters
 from openai import OpenAI
+from dotenv import load_dotenv
 
 load_dotenv()
 TOKEN = os.getenv("TELEGRAM_TOKEN")
@@ -11,8 +11,11 @@ user_conversations = {}
 
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
+    content = update.message.text
+
     messages = user_conversations.get(user_id, [])
-    messages.append({"role": "user", "content": update.message.text})
+    messages.append({"role": "user", "content": content})
+
     try:
         response = client.chat.completions.create(
             model="gpt-3.5-turbo",
@@ -20,28 +23,26 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             temperature=0.7,
         )
         reply = response.choices[0].message.content
-        user_conversations[user_id].append({"role": "assistant", "content": reply})
+        messages.append({"role": "assistant", "content": reply})
     except Exception as e:
         reply = f"Lỗi: {e}"
+
+    user_conversations[user_id] = messages
     await update.message.reply_text(reply)
 
 async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
     doc = update.message.document
     file_name = doc.file_name
-
-    if not os.path.exists("downloads"):
-        os.makedirs("downloads")
-
-    new_file: File = await context.bot.get_file(doc.file_id)
-    file_path = os.path.join("downloads", file_name)
-    await new_file.download_to_drive(file_path)
+    file = await context.bot.get_file(doc.file_id)
+    os.makedirs("downloads", exist_ok=True)
+    path = os.path.join("downloads", file_name)
+    await file.download_to_drive(path)
 
     message = f"📁 Em đã tải xong file: {file_name}."
-
     if file_name.endswith(('.docx', '.xlsx')):
-        message += " Anh muốn em phân tích nội dung hay trích thông tin gì từ file này ạ?"
+        message += "\n➡️ Anh muốn em phân tích nội dung hay trích thông tin gì từ file này ạ?"
     else:
-        message += " Hiện tại em chưa đọc được định dạng này, nhưng nếu cần em có thể xử lý sau."
+        message += "\n⚠️ Hiện tại em chưa đọc được định dạng này, nhưng nếu cần em có thể xử lý sau."
 
     await update.message.reply_text(message)
 
@@ -49,6 +50,4 @@ if __name__ == '__main__':
     app = ApplicationBuilder().token(TOKEN).build()
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
     app.add_handler(MessageHandler(filters.Document.ALL, handle_document))
-    app.add_handler(MessageHandler(~filters.TEXT & ~filters.Document.ALL, handle_text))
-    print("✅ Lucy bot đang chạy trên Render với AutoPing!")
     app.run_polling()
