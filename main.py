@@ -7,7 +7,12 @@ from dotenv import load_dotenv
 load_dotenv()
 TOKEN = os.getenv("TELEGRAM_TOKEN")
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-user_conversations = {}
+user_conversations[user_id] = [
+    {
+        "role": "system",
+        "content": "Bạn là Lucy, một Trợ Lý Báo Cáo cá nhân. Bạn hỗ trợ người dùng trong công việc văn phòng và quản lý nhân sự hàng ngày. Phong cách thân thiện, ngắn gọn, chuyên nghiệp và rõ ràng, luôn nhắc nhẹ khi còn việc quan trọng chưa xong."
+    }
+]
 
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
